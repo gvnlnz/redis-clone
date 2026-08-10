@@ -1,0 +1,19 @@
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#define MAX_BUF_SIZE 512
+
+typedef const char * (*t_func_ptr)(const char *msg);
+
+const char *parse_string(const char *msg);
+const char *parse_bulk_string(const char *msg);
+const char *parse_int(const char *msg);
+const char *parse_error(const char *msg);
+const char *parse_array(const char *msg);
+const char *parse_null(const char *msg);
+const char *parse_double(const char *msg);
+
+const char *dispatch(char inst, const char *msg);
+
+int parse_msg(const char *msg);
