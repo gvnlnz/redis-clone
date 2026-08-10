@@ -1,2 +1,2 @@
 # Redis-clone
-This project intend to be a training for improving my C language skills.
+This project is a training to improve my C language skills.
