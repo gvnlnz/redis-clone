@@ -1,10 +1,12 @@
 #include "resp.h"
 
 int main (void) {
-    char *bulk = "$11\r\nHELLO WORLD\r\n";
-    const char *parsed = parse_msg(bulk);
-    printf("parsed = %s\n", parsed);
+    char *bulk = ":-1234567876\r\n";
+   	void *parsed = parse_msg(bulk);
 
-    destroy_buffer((void*)parsed);
+    if(*bulk == ':') {
+    	ssize_t *number = (ssize_t *)parsed;
+     	printf("number = %ld\n", *number);
+    }
     return 0;
 }

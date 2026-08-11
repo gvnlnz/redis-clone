@@ -1,5 +1,6 @@
 #include "resp.h"
 #include <errno.h>
+#include <limits.h>
 
 enum e_conv {
     CONV_INT        = ':',
@@ -25,7 +26,7 @@ int is_valid_format(const char *msg) {
 	return 1;
 }
 
-const char *parse_simple_string(const char *msg) {
+void *parse_simple_string(const char *msg) {
 	char *buffer = (char *)malloc(MAX_BUF_SIZE * sizeof(char));
 	if(!buffer) {
 		printf("[Error] malloc failed.\n");
@@ -37,10 +38,8 @@ const char *parse_simple_string(const char *msg) {
      	return NULL;
 	}
 
-	printf("*msg -> %c\n", *msg);
 	memset(buffer, 0, MAX_BUF_SIZE);
 	msg++;
-	printf("*msg -> %c\n", *msg);
 	
 	/* now i expect the simple string */
 	size_t len = 0;
@@ -58,7 +57,7 @@ const char *parse_simple_string(const char *msg) {
 	return buffer;
 }
 
-const char *parse_bulk_string(const char *msg) {
+void *parse_bulk_string(const char *msg) {
 	char *buffer = (char *)malloc(MAX_BUF_SIZE * sizeof(char));
 	if(!buffer) {
 		printf("[Error] malloc failed.\n");
@@ -131,31 +130,55 @@ const char *parse_bulk_string(const char *msg) {
     return buffer; // return a pointer after "\r\n"
 }
 
-const char *parse_int(const char *msg) {
-    (void) msg;
-    printf("parse int\n");
-    return 0;
+void *parse_int(const char *msg) {
+	ssize_t *buffer = malloc(sizeof(ssize_t));
+	if(!buffer) {
+		printf("[Error] malloc failed.\n");
+		return NULL;
+	}
+
+	if (!msg || *msg != ':') {
+		printf("[Error] invalid format.\n");
+		return NULL;
+	}
+
+	memset(buffer, 0, sizeof(ssize_t));
+	msg++; // skip inst
+
+	char *endptr;
+	long number = strtol(msg, &endptr, 10);
+	if(number > INT_MAX || number < INT_MIN) {
+		printf("[Error] number size exides the limits.\n");
+		return NULL;
+	}
+
+	printf("number -> %ld\n", number);
+	if(!is_valid_format(endptr))
+		return NULL;
+
+	memcpy(buffer, &number, sizeof(ssize_t));
+	return buffer;
 }
 
-const char *parse_error(const char *msg) {
+void *parse_error(const char *msg) {
     (void) msg;
     printf("parse error");
     return 0;
 }
 
-const char *parse_array(const char *msg) {
+void *parse_array(const char *msg) {
     (void) msg;
     printf("parse array\n");
     return 0;
 }
 
-const char *parse_null(const char *msg) {
+void *parse_null(const char *msg) {
     (void) msg;
     printf("parse null\n");
     return 0;
 }
 
-const char *parse_double(const char *msg) {
+void *parse_double(const char *msg) {
     (void) msg;
     printf("parse float\n");
     return 0;
@@ -171,7 +194,7 @@ const t_func_ptr g_table[256] = {
     [CONV_DOUBLE]    = parse_double,
 };
 
-const char *dispatch(char inst, const char *msg) {
+void *dispatch(char inst, const char *msg) {
     t_func_ptr fn;
 
     fn = g_table[(unsigned char) inst];
@@ -180,7 +203,7 @@ const char *dispatch(char inst, const char *msg) {
     return fn(msg);
 }
 
-const char *parse_msg(const char *msg) {
+void *parse_msg(const char *msg) {
     // 1. read the instruction
     char inst;
 
