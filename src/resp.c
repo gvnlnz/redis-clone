@@ -1,4 +1,5 @@
 #include "resp.h"
+#include <errno.h>
 
 enum e_conv {
     CONV_INT        = ':',
@@ -10,6 +11,15 @@ enum e_conv {
     CONV_DOUBLE     = ',',
 };
 
+int is_valid_format(const char *msg) {
+	const char *cmsg = (const char *)msg;
+	if(*cmsg != '\r' || *(cmsg+1) != '\n') {
+        printf("[Error] invalid format.\n");
+        return 0;
+    }
+	return 1;
+}
+
 const char *parse_string(const char *msg) {
     (void) msg;
     printf("parse string\n");
@@ -18,44 +28,68 @@ const char *parse_string(const char *msg) {
 
 const char *parse_bulk_string(const char *msg) {
     char buffer[MAX_BUF_SIZE];
+    long len;
+    char *endptr;
+
+    if(!msg || *msg != '$') {
+    	printf("[Error] invalid string.\n");
+     	return NULL;
+    }
+
     memset(buffer, 0, MAX_BUF_SIZE);
     msg++; // skip inst
-    unsigned int len = atoi(msg);
 
-    if(len == 0) {
-        // atoi(msg) returned 0 from something which wasn't a nunmber
-        if(*(msg + 1)  != '\r' || *(msg + 2) != '\n') {
-            printf("[Error] invalid format.\n");
-            return NULL;
-        // atoi(msg) was really 0.
-        } else {
-            printf("Empty string detected.\n");
-            return msg + 3;
-        }
+    /**
+     * strtol stores the first invalid character in &endptr. 
+     * returns a 10-based long integer. 
+     */
+    errno = 0;
+    len = strtol(msg, &endptr, 10);
+
+    /* length overflow check */
+    if (errno == ERANGE) {
+    	printf("[Error] length out of range.\n");
+     	return NULL;
     }
+
+    /* no digit found */
+    if (endptr == msg) {
+    	printf("[Error] invalid format.\n");
+     	return NULL;
+    }
+
+    /* the number must be followed immediately by "\r\n" */
+    if(!is_valid_format(endptr)) 
+    	return NULL;
+
+    /* null bulk string */
+    if (len == -1) {
+    	printf("Null bulk string detected.\n");
+     	return endptr + 2;
+    }
+
+    /* other negatives length are not allowed */
+    if (len < 0) {
+   		printf("[Error] negative length is not allowed.\n");
+    	return NULL;
+    }
+
+    /* buffer overflow check */
     if(len >= MAX_BUF_SIZE) {
         printf("Bulk string length too big.\n");
         return NULL;
     }
 
-    while(*msg && *msg != '\r') // this is due to the possibility of a multi-character length.
-        msg++;
+    msg = endptr + 2; // points to the start of the string
 
-    // expecting '\r\n'
-    if(*msg != '\r' || *(msg+1) != '\n') {
-        printf("[Error] invalid format.\n");
-        return NULL;
-    }
-
-    msg += 2; // now msg points to the start of the string
     memcpy(buffer, msg, len);
     buffer[len] = '\0';
+
     msg += len;
 
-    if(*msg != '\r' || *(msg+1) != '\n') {
-        printf("[Error] invalid format.\n");
-        return NULL;
-    }
+    /* string must be terminated with "\r\n" */
+    if(!is_valid_format(msg)) 
+    	return NULL;
 
     printf("bulk string -> %s\n", buffer);
     return msg + 2; // return a pointer after "\r\n"
@@ -110,18 +144,22 @@ const char *dispatch(char inst, const char *msg) {
     return fn(msg);
 }
 
-int parse_msg(const char *msg) {
+const char *parse_msg(const char *msg) {
     // 1. read the instruction
-    char inst = *msg;
-    if(!inst) {
-        printf("[Error] invalid format.\n");
-        return -1;
-    }
-    // 2. dispatch the msg to instr. controller
-    if (dispatch(inst, msg) == NULL) {
-    	printf("[Error] bad instruction.\n");
-     	return -1;
-    } 
+    char inst;
 
-    return 0;
+    if(!msg || !*msg) {
+    	printf("[Error] invalid format.\n");
+     	return NULL;
+    }
+
+    inst = *msg;
+
+    if(!g_table[(unsigned char) inst]) {
+    	printf("[Error] bad instruction.\n");
+     	return NULL;
+    }
+    
+    // 2. dispatch the msg to instr. controller
+    return dispatch(inst, msg);
 }

@@ -15,5 +15,4 @@ const char *parse_null(const char *msg);
 const char *parse_double(const char *msg);
 
 const char *dispatch(char inst, const char *msg);
-
-int parse_msg(const char *msg);
+const char *parse_msg(const char *msg);
