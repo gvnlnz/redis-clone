@@ -6,7 +6,8 @@
 
 typedef const char * (*t_func_ptr)(const char *msg);
 
-const char *parse_string(const char *msg);
+int destroy_buffer(void *buffer);
+const char *parse_simple_string(const char *msg);
 const char *parse_bulk_string(const char *msg);
 const char *parse_int(const char *msg);
 const char *parse_error(const char *msg);

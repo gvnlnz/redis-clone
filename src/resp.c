@@ -11,6 +11,11 @@ enum e_conv {
     CONV_DOUBLE     = ',',
 };
 
+int destroy_buffer(void *buffer) {
+	free(buffer);
+	return 0;
+}
+
 int is_valid_format(const char *msg) {
 	const char *cmsg = (const char *)msg;
 	if(*cmsg != '\r' || *(cmsg+1) != '\n') {
@@ -20,14 +25,46 @@ int is_valid_format(const char *msg) {
 	return 1;
 }
 
-const char *parse_string(const char *msg) {
-    (void) msg;
-    printf("parse string\n");
-    return 0;
+const char *parse_simple_string(const char *msg) {
+	char *buffer = (char *)malloc(MAX_BUF_SIZE * sizeof(char));
+	if(!buffer) {
+		printf("[Error] malloc failed.\n");
+		return NULL;
+	}
+	
+	if (!msg || *msg != '+') {
+		printf("[Error] invalid string.\n");
+     	return NULL;
+	}
+
+	printf("*msg -> %c\n", *msg);
+	memset(buffer, 0, MAX_BUF_SIZE);
+	msg++;
+	printf("*msg -> %c\n", *msg);
+	
+	/* now i expect the simple string */
+	size_t len = 0;
+	const char *start = msg;
+	while (*msg != '\r') {
+		len++;
+		msg++;
+	}
+	memcpy(buffer, start, len);
+	buffer[len] = '\0';
+
+	if(!is_valid_format(msg))
+    	return NULL;
+	
+	return buffer;
 }
 
 const char *parse_bulk_string(const char *msg) {
-    char buffer[MAX_BUF_SIZE];
+	char *buffer = (char *)malloc(MAX_BUF_SIZE * sizeof(char));
+	if(!buffer) {
+		printf("[Error] malloc failed.\n");
+		return NULL;
+	}
+	
     long len;
     char *endptr;
 
@@ -40,8 +77,8 @@ const char *parse_bulk_string(const char *msg) {
     msg++; // skip inst
 
     /**
-     * strtol stores the first invalid character in &endptr. 
-     * returns a 10-based long integer. 
+     * strtol stores the first invalid character in &endptr.
+     * returns a 10-based long integer.
      */
     errno = 0;
     len = strtol(msg, &endptr, 10);
@@ -59,7 +96,7 @@ const char *parse_bulk_string(const char *msg) {
     }
 
     /* the number must be followed immediately by "\r\n" */
-    if(!is_valid_format(endptr)) 
+    if(!is_valid_format(endptr))
     	return NULL;
 
     /* null bulk string */
@@ -88,11 +125,10 @@ const char *parse_bulk_string(const char *msg) {
     msg += len;
 
     /* string must be terminated with "\r\n" */
-    if(!is_valid_format(msg)) 
+    if(!is_valid_format(msg))
     	return NULL;
 
-    printf("bulk string -> %s\n", buffer);
-    return msg + 2; // return a pointer after "\r\n"
+    return buffer; // return a pointer after "\r\n"
 }
 
 const char *parse_int(const char *msg) {
@@ -126,7 +162,7 @@ const char *parse_double(const char *msg) {
 }
 
 const t_func_ptr g_table[256] = {
-    [CONV_STR]       = parse_string,
+    [CONV_STR]       = parse_simple_string,
     [CONV_BULK]      = parse_bulk_string,
     [CONV_INT]       = parse_int,
     [CONV_ERR]       = parse_error,
@@ -159,7 +195,7 @@ const char *parse_msg(const char *msg) {
     	printf("[Error] bad instruction.\n");
      	return NULL;
     }
-    
+
     // 2. dispatch the msg to instr. controller
     return dispatch(inst, msg);
 }
