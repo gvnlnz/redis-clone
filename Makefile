@@ -25,3 +25,6 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 
 clean: 
 	rm -f $(TARGET) $(OBJ)
+	
+run: 
+	./$(TARGET)
