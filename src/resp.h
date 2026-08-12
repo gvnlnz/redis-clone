@@ -52,5 +52,4 @@ void *decode_array(const char *msg);
 void *decode_error(const char *msg);
 void *decode_msg(const char *msg);
 void *decode_int(const char *msg);
-int resp_destroy(void *buffer);
-int destroy_buffer(void *buffer);
+int resp_destroy(t_resp_info *buffer);
