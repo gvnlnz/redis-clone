@@ -11,10 +11,10 @@ typedef enum {
     RESP_SIMPLE_STRING,
     RESP_BULK_STRING,
     RESP_INTEGER,
+    RESP_DOUBLE,
     RESP_ARRAY,
     RESP_ERROR,
     RESP_NULL,
-    RESP_DOUBLE,
 } t_resp_type;
 
 enum e_conv {
@@ -32,17 +32,17 @@ typedef struct resp_array {
 	struct resp_value **elements;
 } resp_array;
 
-typedef struct resp_value {
+typedef struct t_resp_info {
 	t_resp_type type;
 
 	/* only need one type of the following */
 	union {	
-		char *string;
+		char buffer[MAX_BUF_SIZE];
 		long integer;
 		double doub;
 		resp_array array;
 	} data;
-} resp_value;
+} t_resp_info;
 
 void *decode_simple_string(const char *msg);
 void *dispatch(char inst, const char *msg);
@@ -52,4 +52,5 @@ void *decode_array(const char *msg);
 void *decode_error(const char *msg);
 void *decode_msg(const char *msg);
 void *decode_int(const char *msg);
+int resp_destroy(void *buffer);
 int destroy_buffer(void *buffer);

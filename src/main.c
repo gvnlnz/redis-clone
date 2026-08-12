@@ -1,18 +1,10 @@
 #include "resp.h"
 
 int main (void) {
-    char *bulk = ",14714814.11211318931\r\n";
-   	void *parsed = decode_msg(bulk);
-
-    if(*bulk == ':') {
-    	ssize_t *number = (ssize_t *)parsed;
-     	printf("number = %ld\n", *number);
-    } else if (*bulk == ',') {
-    	double *number = (double *)parsed;
-     	printf("number = %lf\n", *number);
-    } else {
-    	const char *msg = (const char *)parsed;
-     	printf("msg = %s\n", msg);
-    }
+	const char *msg = "$11\r\nHELLO WORLD\r\n";
+	t_resp_info *value = decode_msg(msg);
+	
+	printf("type of value = %d\n", value->type);
+	printf("data value = %s\n", value->data.buffer);
     return 0;
 }
