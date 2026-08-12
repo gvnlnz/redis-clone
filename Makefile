@@ -1,5 +1,5 @@
 CC := gcc
-CFLAGS := -Werror -Wextra -Wall
+CFLAGS := -Werror -Wextra -Wall -std=c99
 TARGET := redis-clone
 
 SRC_DIR := src
