@@ -3,16 +3,6 @@
 #include <limits.h>
 #include <stdlib.h>
 
-enum e_conv {
-    CONV_INT        = ':',
-    CONV_STR        = '+',
-    CONV_BULK       = '$',
-    CONV_ERR        = '-',
-    CONV_ARRAY      = '*',
-    CONV_NULL       = '_',
-    CONV_DOUBLE     = ',',
-};
-
 int destroy_buffer(void *buffer) {
 	free(buffer);
 	return 0;
@@ -213,9 +203,9 @@ void *decode_error(const char *msg) {
 }
 
 void *decode_array(const char *msg) {
-    (void) msg;
-    printf("parse array\n");
-    return 0;
+	(void) msg;
+	printf("array -> %s\n", msg);
+	return NULL;
 }
 
 void *decode_double(const char *msg) {
@@ -254,6 +244,7 @@ void *decode_double(const char *msg) {
     return buffer;
 }
 
+/* 256 is the range of an (unsinged char) */
 const t_func_ptr g_table[256] = {
     [CONV_STR]       = decode_simple_string,
     [CONV_BULK]      = decode_bulk_string,
