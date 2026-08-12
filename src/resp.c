@@ -1,6 +1,7 @@
 #include "resp.h"
 #include <errno.h>
 #include <limits.h>
+#include <stdlib.h>
 
 enum e_conv {
     CONV_INT        = ':',
@@ -35,11 +36,12 @@ void *decode_simple_string(const char *msg) {
 	
 	if (!msg || *msg != '+') {
 		printf("[Error] invalid string.\n");
+		destroy_buffer(buffer);
      	return NULL;
 	}
 
 	memset(buffer, 0, MAX_BUF_SIZE);
-	msg++;
+	msg++; // skip inst (+)
 	
 	/* now i expect the simple string */
 	size_t len = 0;
@@ -51,8 +53,10 @@ void *decode_simple_string(const char *msg) {
 	memcpy(buffer, start, len);
 	buffer[len] = '\0';
 
-	if(!is_valid_format(msg))
+	if(!is_valid_format(msg)) {
+		destroy_buffer(buffer);
     	return NULL;
+	}
 	
 	return buffer;
 }
@@ -69,11 +73,12 @@ void *decode_bulk_string(const char *msg) {
 
     if(!msg || *msg != '$') {
     	printf("[Error] invalid string.\n");
+     	destroy_buffer(buffer);
      	return NULL;
     }
 
     memset(buffer, 0, MAX_BUF_SIZE);
-    msg++; // skip inst
+    msg++; // skip inst ($)
 
     /**
      * strtol stores the first invalid character in &endptr.
@@ -85,34 +90,41 @@ void *decode_bulk_string(const char *msg) {
     /* length overflow check */
     if (errno == ERANGE) {
     	printf("[Error] length out of range.\n");
+     	destroy_buffer(buffer);
      	return NULL;
     }
 
     /* no digit found */
     if (endptr == msg) {
     	printf("[Error] invalid format.\n");
+     	destroy_buffer(buffer);
      	return NULL;
     }
 
     /* the number must be followed immediately by "\r\n" */
-    if(!is_valid_format(endptr))
+    if(!is_valid_format(endptr)) {
+    	destroy_buffer(buffer);
     	return NULL;
+    }
 
     /* null bulk string */
     if (len == -1) {
     	printf("Null bulk string detected.\n");
+     	destroy_buffer(buffer);
      	return endptr + 2;
     }
 
     /* other negatives length are not allowed */
     if (len < 0) {
    		printf("[Error] negative length is not allowed.\n");
+     	destroy_buffer(buffer);
     	return NULL;
     }
 
     /* buffer overflow check */
     if(len >= MAX_BUF_SIZE) {
         printf("Bulk string length too big.\n");
+        destroy_buffer(buffer);
         return NULL;
     }
 
@@ -124,8 +136,10 @@ void *decode_bulk_string(const char *msg) {
     msg += len;
 
     /* string must be terminated with "\r\n" */
-    if(!is_valid_format(msg))
+    if(!is_valid_format(msg)) {
+    	destroy_buffer(buffer);
     	return NULL;
+    }
 
     return buffer; // return a pointer after "\r\n"
 }
@@ -139,22 +153,26 @@ void *decode_int(const char *msg) {
 
 	if (!msg || *msg != ':') {
 		printf("[Error] invalid format.\n");
+		destroy_buffer(buffer);
 		return NULL;
 	}
 
 	memset(buffer, 0, sizeof(ssize_t));
-	msg++; // skip inst
+	msg++; // skip inst (:)
 
 	char *endptr;
 	long number = strtol(msg, &endptr, 10);
 	if(number > INT_MAX || number < INT_MIN) {
 		printf("[Error] number size exides the limits.\n");
+		destroy_buffer(buffer);
 		return NULL;
 	}
 
 	printf("number -> %ld\n", number);
-	if(!is_valid_format(endptr))
+	if(!is_valid_format(endptr)) {
+		destroy_buffer(buffer);
 		return NULL;
+	}
 
 	memcpy(buffer, &number, sizeof(ssize_t));
 	return buffer;
@@ -169,11 +187,12 @@ void *decode_error(const char *msg) {
 	
 	if (!msg || *msg != '-') {
 		printf("[Error] invalid format.\n");
+		destroy_buffer(buffer);
      	return NULL;
 	}
 
 	memset(buffer, 0, MAX_BUF_SIZE);
-	msg++;
+	msg++; // skip inst (-)
 	
 	/* now i expect the error */
 	size_t len = 0;
@@ -185,8 +204,10 @@ void *decode_error(const char *msg) {
 	memcpy(buffer, start, len);
 	buffer[len] = '\0';
 
-	if(!is_valid_format(msg))
+	if(!is_valid_format(msg)) {
+		destroy_buffer(buffer);
     	return NULL;
+	}
 	
 	return buffer;
 }
@@ -197,16 +218,40 @@ void *decode_array(const char *msg) {
     return 0;
 }
 
-void *decode_null(const char *msg) {
-    (void) msg;
-    printf("parse null\n");
-    return 0;
-}
-
 void *decode_double(const char *msg) {
-    (void) msg;
-    printf("parse float\n");
-    return 0;
+	double *buffer, number;
+	char *endptr;
+	
+	buffer = (double *)malloc(sizeof(double));
+	if(!buffer) {
+		printf("[Error] malloc failed.\n");
+		return NULL;
+	}
+	memset(buffer, 0, sizeof(double));
+    
+    msg++; // skip inst (,)
+    errno = 0;
+    number = strtod(msg, &endptr); // reads unitl '\r' or something != '.'
+    
+    if (errno == ERANGE) {
+    	printf("[Error] number out of range.\n");
+    	destroy_buffer(buffer);
+     	return NULL;
+    }
+
+    if(endptr == msg) {
+    	printf("[Error] invalid number.\n");
+     	destroy_buffer(buffer);
+     	return NULL;
+    }
+
+    if(!is_valid_format(endptr)) {
+    	destroy_buffer(buffer);
+    	return NULL;
+    }
+
+    *buffer = number;
+    return buffer;
 }
 
 const t_func_ptr g_table[256] = {
@@ -215,7 +260,6 @@ const t_func_ptr g_table[256] = {
     [CONV_INT]       = decode_int,
     [CONV_ERR]       = decode_error,
     [CONV_ARRAY]     = decode_array,
-    [CONV_NULL]      = decode_null,
     [CONV_DOUBLE]    = decode_double,
 };
 

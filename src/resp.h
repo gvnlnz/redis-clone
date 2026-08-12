@@ -12,7 +12,6 @@ void *decode_bulk_string(const char *msg);
 void *decode_double(const char *msg);
 void *decode_array(const char *msg);
 void *decode_error(const char *msg);
-void *decode_null(const char *msg);
 void *decode_msg(const char *msg);
 void *decode_int(const char *msg);
 int destroy_buffer(void *buffer);
