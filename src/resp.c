@@ -26,7 +26,7 @@ int is_valid_format(const char *msg) {
 	return 1;
 }
 
-void *parse_simple_string(const char *msg) {
+void *decode_simple_string(const char *msg) {
 	char *buffer = (char *)malloc(MAX_BUF_SIZE * sizeof(char));
 	if(!buffer) {
 		printf("[Error] malloc failed.\n");
@@ -57,7 +57,7 @@ void *parse_simple_string(const char *msg) {
 	return buffer;
 }
 
-void *parse_bulk_string(const char *msg) {
+void *decode_bulk_string(const char *msg) {
 	char *buffer = (char *)malloc(MAX_BUF_SIZE * sizeof(char));
 	if(!buffer) {
 		printf("[Error] malloc failed.\n");
@@ -130,7 +130,7 @@ void *parse_bulk_string(const char *msg) {
     return buffer; // return a pointer after "\r\n"
 }
 
-void *parse_int(const char *msg) {
+void *decode_int(const char *msg) {
 	ssize_t *buffer = malloc(sizeof(ssize_t));
 	if(!buffer) {
 		printf("[Error] malloc failed.\n");
@@ -160,38 +160,63 @@ void *parse_int(const char *msg) {
 	return buffer;
 }
 
-void *parse_error(const char *msg) {
-    (void) msg;
-    printf("parse error");
-    return 0;
+void *decode_error(const char *msg) {
+	char *buffer = (char *)malloc(MAX_BUF_SIZE * sizeof(char));
+	if(!buffer) {
+		printf("[Error] malloc failed.\n");
+		return NULL;
+	}
+	
+	if (!msg || *msg != '-') {
+		printf("[Error] invalid format.\n");
+     	return NULL;
+	}
+
+	memset(buffer, 0, MAX_BUF_SIZE);
+	msg++;
+	
+	/* now i expect the error */
+	size_t len = 0;
+	const char *start = msg;
+	while (*msg != '\r') {
+		len++;
+		msg++;
+	}
+	memcpy(buffer, start, len);
+	buffer[len] = '\0';
+
+	if(!is_valid_format(msg))
+    	return NULL;
+	
+	return buffer;
 }
 
-void *parse_array(const char *msg) {
+void *decode_array(const char *msg) {
     (void) msg;
     printf("parse array\n");
     return 0;
 }
 
-void *parse_null(const char *msg) {
+void *decode_null(const char *msg) {
     (void) msg;
     printf("parse null\n");
     return 0;
 }
 
-void *parse_double(const char *msg) {
+void *decode_double(const char *msg) {
     (void) msg;
     printf("parse float\n");
     return 0;
 }
 
 const t_func_ptr g_table[256] = {
-    [CONV_STR]       = parse_simple_string,
-    [CONV_BULK]      = parse_bulk_string,
-    [CONV_INT]       = parse_int,
-    [CONV_ERR]       = parse_error,
-    [CONV_ARRAY]     = parse_array,
-    [CONV_NULL]      = parse_null,
-    [CONV_DOUBLE]    = parse_double,
+    [CONV_STR]       = decode_simple_string,
+    [CONV_BULK]      = decode_bulk_string,
+    [CONV_INT]       = decode_int,
+    [CONV_ERR]       = decode_error,
+    [CONV_ARRAY]     = decode_array,
+    [CONV_NULL]      = decode_null,
+    [CONV_DOUBLE]    = decode_double,
 };
 
 void *dispatch(char inst, const char *msg) {
@@ -203,7 +228,7 @@ void *dispatch(char inst, const char *msg) {
     return fn(msg);
 }
 
-void *parse_msg(const char *msg) {
+void *decode_msg(const char *msg) {
     // 1. read the instruction
     char inst;
 
