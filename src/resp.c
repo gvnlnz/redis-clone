@@ -11,7 +11,6 @@ int resp_destroy(t_resp_info *buffer) {
 int is_valid_format(const char *msg) {
 	const char *cmsg = (const char *)msg;
 	if(*cmsg != '\r' || *(cmsg+1) != '\n') {
-        printf("[Error] invalid format.\n");
         return 0;
     }
 	return 1;
@@ -23,16 +22,9 @@ void *decode_simple_string(const char *msg) {
 		printf("[Error] malloc failed.\n");
 		return NULL;
 	}
-	
-	if (!msg || *msg != '+') {
-		printf("[Error] invalid string.\n");
-		resp_destroy(value);
-     	return NULL;
-	}
 
-	value->type = RESP_SIMPLE_STRING;
 	memset(value, 0, sizeof(t_resp_info));
-	msg++; // skip inst (+)
+	value->type = RESP_SIMPLE_STRING;
 	
 	/* now i expect the simple string */
 	size_t len = 0;
@@ -46,6 +38,8 @@ void *decode_simple_string(const char *msg) {
 
 	if(!is_valid_format(msg)) {
 		resp_destroy(value);
+  		printf("[Error] invalid format.\n");
+    	msg = start; /* backup of the pointer to the initial position. */
     	return NULL;
 	}
 	
@@ -62,15 +56,8 @@ void *decode_bulk_string(const char *msg) {
     long len;
     char *endptr;
 
-    if(!msg || *msg != '$') {
-    	printf("[Error] invalid string.\n");
-     	resp_destroy(value);
-     	return NULL;
-    }
-
     memset(value, 0, sizeof(t_resp_info));
     value->type = RESP_BULK_STRING;
-    msg++; // skip inst ($)
 
     /**
      * strtol stores the first invalid character in &endptr.
@@ -142,16 +129,9 @@ void *decode_int(const char *msg) {
 		printf("[Error] malloc failed.\n");
 		return NULL;
 	}
-
-	if (!msg || *msg != ':') {
-		printf("[Error] invalid format.\n");
-		resp_destroy(value);
-		return NULL;
-	}
 	
 	memset(value, 0, sizeof(t_resp_info));
 	value->type = RESP_INTEGER;
-	msg++; // skip inst (:)
 
 	char *endptr;
 	long number = strtol(msg, &endptr, 10);
@@ -161,7 +141,6 @@ void *decode_int(const char *msg) {
 		return NULL;
 	}
 
-	printf("number -> %ld\n", number);
 	if(!is_valid_format(endptr)) {
 		resp_destroy(value);
 		return NULL;
@@ -178,15 +157,8 @@ void *decode_error(const char *msg) {
 		return NULL;
 	}
 	
-	if (!msg || *msg != '-') {
-		printf("[Error] invalid format.\n");
-		resp_destroy(value);
-     	return NULL;
-	}
-
 	memset(value, 0, sizeof(t_resp_info));
 	value->type = RESP_ERROR;
-	msg++; // skip inst (-)
 	
 	/* now i expect the error */
 	size_t len = 0;
@@ -224,10 +196,9 @@ void *decode_double(const char *msg) {
 	
 	memset(value, 0, sizeof(t_resp_info));
 	value->type = RESP_DOUBLE;
-    msg++; // skip inst (,)
     
     errno = 0;
-    number = strtod(msg, &endptr); // reads unitl '\r' or something != '.'
+    number = strtod(msg, &endptr); // reads until '\r' or something != '.'
     
     if (errno == ERANGE) {
     	printf("[Error] number out of range.\n");
@@ -286,5 +257,5 @@ void *decode_msg(const char *msg) {
     }
 
     // 2. dispatch the msg to instr. controller
-    return dispatch(inst, msg);
+    return dispatch(inst, ++msg);
 }
