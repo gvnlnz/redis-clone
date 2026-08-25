@@ -194,10 +194,89 @@ void *decode_error(const char **msg) {
 	return value;
 }
 
-void *decode_array(const char *msg) {
-	(void) msg;
-	printf("array -> %s\n", msg);
-	return NULL;
+void *decode_array(const char **msg) {
+	t_resp_info *value = (t_resp_info *)malloc(sizeof(t_resp_info));
+	if(!value) {
+		printf("[Error] malloc failed.\n");
+		return NULL;
+	}
+	
+	memset(value, 0, sizeof(t_resp_info));
+	value->type = RESP_ARRAY;
+
+    char *endptr;
+    const char *p = *msg;
+
+    errno = 0;
+    long array_len = strtol(p, &endptr, 10);
+
+    if(errno == ERANGE) {
+	   	printf("[Error] number out of range.\n");
+	   	resp_destroy(value);
+    	return NULL;
+    }
+
+    if(endptr == p) {
+    	printf("[Error] invalid number.\n");
+     	resp_destroy(value);
+     	return NULL;
+    }
+
+    /* here i expect "\r\n" */
+    if(!is_valid_format(endptr)) {
+    	resp_destroy(value);
+    	return NULL;
+    }
+
+    /* null array */
+    if(array_len == -1) {
+    	value->type = RESP_NULL;
+    	*msg = endptr + 2;
+    	return value;
+    }
+
+    /* other negative lengths are not allowed */
+    if(array_len < 0) {
+    	printf("[Error] negative length is not allowed.\n");
+    	resp_destroy(value);
+    	return NULL;
+    }
+
+    p = endptr + 2; /* skip "\r\n": points to the start of the first array member. */
+
+    /* empty array: nothing to allocate, nothing to parse. */
+    if(array_len == 0) {
+    	*msg = p;
+    	return value;
+    }
+
+    t_resp_info **elements = (t_resp_info **) malloc((size_t)array_len * sizeof(t_resp_info *));
+    if(!elements) {
+    	printf("[Error] malloc failed.\n");
+    	resp_destroy(value);
+    	return NULL;
+    }
+
+    /* size is only valid once elements exists: resp_destroy walks both. */
+    value->data.array.elements = elements;
+    value->data.array.size = (size_t)array_len;
+
+    /* start to parse array element */
+    for(size_t i = 0; i < (size_t)array_len; i++) {
+      	t_resp_info *elem = decode_msg(&p);
+       	if(!elem) {
+       		/* free the elements decoded so far, then the half-built array. */
+       		value->data.array.size = i;
+       		resp_destroy(value);
+       		return NULL;
+       	}
+
+        /* store the element inside of the **elements array of pointer */
+        elements[i] = elem;
+    }
+
+    *msg = p;
+	return value;
 }
 
 void *decode_double(const char **msg) {
