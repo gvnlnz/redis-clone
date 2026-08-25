@@ -4,6 +4,15 @@
 #include <stdlib.h>
 
 int resp_destroy(t_resp_info *buffer) {
+	if(!buffer) return 0;
+
+	if(buffer->type == RESP_ARRAY) {
+		for(size_t i = 0; i < buffer->data.array.size; i++) {
+			resp_destroy(buffer->data.array.elements[i]);
+		}
+		free(buffer->data.array.elements);
+	}
+
 	free(buffer);
 	return 0;
 }
@@ -16,7 +25,7 @@ int is_valid_format(const char *msg) {
 	return 1;
 }
 
-void *decode_simple_string(const char *msg) {
+void *decode_simple_string(const char **msg) {
 	t_resp_info *value = (t_resp_info *)malloc(sizeof(t_resp_info));
 	if(!value) {
 		printf("[Error] malloc failed.\n");
@@ -28,25 +37,26 @@ void *decode_simple_string(const char *msg) {
 	
 	/* now i expect the simple string */
 	size_t len = 0;
-	const char *start = msg;
-	while (*msg != '\r') {
+	const char *start = *msg;
+	const char *p = start;
+	while (*p != '\r') {
 		len++;
-		msg++;
+		p++;
 	}
 	memcpy(value->data.buffer, start, len);
 	value->data.buffer[len] = '\0';
 
-	if(!is_valid_format(msg)) {
+	if(!is_valid_format(p)) {
 		resp_destroy(value);
   		printf("[Error] invalid format.\n");
-    	msg = start; /* backup of the pointer to the initial position. */
     	return NULL;
 	}
-	
+
+	*msg = p + 2;
 	return value;
 }
 
-void *decode_bulk_string(const char *msg) {
+void *decode_bulk_string(const char **msg) {
 	t_resp_info *value = (t_resp_info *)malloc(sizeof(t_resp_info));
 	if(!value) {
 		printf("[Error] malloc failed.\n");
@@ -55,6 +65,7 @@ void *decode_bulk_string(const char *msg) {
 	
     long len;
     char *endptr;
+    const char *p = *msg;
 
     memset(value, 0, sizeof(t_resp_info));
     value->type = RESP_BULK_STRING;
@@ -64,7 +75,7 @@ void *decode_bulk_string(const char *msg) {
      * returns a 10-based long integer.
      */
     errno = 0;
-    len = strtol(msg, &endptr, 10);
+    len = strtol(p, &endptr, 10);
 
     /* length overflow check */
     if (errno == ERANGE) {
@@ -74,7 +85,7 @@ void *decode_bulk_string(const char *msg) {
     }
 
     /* no digit found */
-    if (endptr == msg) {
+    if (endptr == p) {
     	printf("[Error] invalid format.\n");
      	resp_destroy(value);
      	return NULL;
@@ -90,6 +101,7 @@ void *decode_bulk_string(const char *msg) {
     if (len == -1) {
     	printf("Null bulk string detected.\n");
         value->type = RESP_NULL;
+        *msg = endptr + 2;
         return value;
     }
 
@@ -107,23 +119,24 @@ void *decode_bulk_string(const char *msg) {
         return NULL;
     }
 
-    msg = endptr + 2; // points to the start of the string
+    p = endptr + 2; // points to the start of the string
 
-    memcpy(value->data.buffer, msg, len);
+    memcpy(value->data.buffer, p, len);
     value->data.buffer[len] = '\0';
 
-    msg += len;
+    p += len;
 
     /* string must be terminated with "\r\n" */
-    if(!is_valid_format(msg)) {
+    if(!is_valid_format(p)) {
     	resp_destroy(value);
     	return NULL;
     }
 
-    return value; // return a pointer after "\r\n"
+    *msg = p + 2;
+    return value;
 }
 
-void *decode_int(const char *msg) {
+void *decode_int(const char **msg) {
 	t_resp_info *value = (t_resp_info *)malloc(sizeof(t_resp_info));
 	if(!value) {
 		printf("[Error] malloc failed.\n");
@@ -134,7 +147,7 @@ void *decode_int(const char *msg) {
 	value->type = RESP_INTEGER;
 
 	char *endptr;
-	long number = strtol(msg, &endptr, 10);
+	long number = strtol(*msg, &endptr, 10);
 	if(number > INT_MAX || number < INT_MIN) {
 		printf("[Error] number size exides the limits.\n");
 		resp_destroy(value);
@@ -147,10 +160,11 @@ void *decode_int(const char *msg) {
 	}
 
 	value->data.integer = number;
+	*msg = endptr + 2;
 	return value;
 }
 
-void *decode_error(const char *msg) {
+void *decode_error(const char **msg) {
 	t_resp_info *value = (t_resp_info *)malloc(sizeof(t_resp_info));
 	if(!value) {
 		printf("[Error] malloc failed.\n");
@@ -162,19 +176,21 @@ void *decode_error(const char *msg) {
 	
 	/* now i expect the error */
 	size_t len = 0;
-	const char *start = msg;
-	while (*msg != '\r') {
+	const char *start = *msg;
+	const char *p = start;
+	while (*p != '\r') {
 		len++;
-		msg++;
+		p++;
 	}
 	memcpy(value->data.buffer, start, len);
 	value->data.buffer[len] = '\0';
 
-	if(!is_valid_format(msg)) {
+	if(!is_valid_format(p)) {
 		resp_destroy(value);
     	return NULL;
 	}
-	
+
+	*msg = p + 2;
 	return value;
 }
 
@@ -184,7 +200,7 @@ void *decode_array(const char *msg) {
 	return NULL;
 }
 
-void *decode_double(const char *msg) {
+void *decode_double(const char **msg) {
 	t_resp_info *value = (t_resp_info *)malloc(sizeof(t_resp_info));
 	if(!value) {
 		printf("[Error] malloc failed.\n");
@@ -198,7 +214,7 @@ void *decode_double(const char *msg) {
 	value->type = RESP_DOUBLE;
     
     errno = 0;
-    number = strtod(msg, &endptr); // reads until '\r' or something != '.'
+    number = strtod(*msg, &endptr); // reads until '\r' or something != '.'
     
     if (errno == ERANGE) {
     	printf("[Error] number out of range.\n");
@@ -206,7 +222,7 @@ void *decode_double(const char *msg) {
      	return NULL;
     }
 
-    if(endptr == msg) {
+    if(endptr == *msg) {
     	printf("[Error] invalid number.\n");
      	resp_destroy(value);
      	return NULL;
@@ -218,6 +234,7 @@ void *decode_double(const char *msg) {
     }
 
     value->data.doub = number;
+    *msg = endptr + 2;
     return value;
 }
 
@@ -231,7 +248,7 @@ const t_func_ptr g_table[256] = {
     [CONV_DOUBLE]    = decode_double,
 };
 
-void *dispatch(char inst, const char *msg) {
+void *dispatch(char inst, const char **msg) {
     t_func_ptr fn;
 
     fn = g_table[(unsigned char) inst];
@@ -240,22 +257,22 @@ void *dispatch(char inst, const char *msg) {
     return fn(msg);
 }
 
-void *decode_msg(const char *msg) {
-    // 1. read the instruction
-    char inst;
+void *decode_msg(const char **msg) {
 
-    if(!msg || !*msg) {
+    if(!msg || !*msg || !**msg) {
     	printf("[Error] invalid format.\n");
      	return NULL;
     }
-
-    inst = *msg;
+    
+    // 1. read the instruction
+    char inst = **msg;
 
     if(!g_table[(unsigned char) inst]) {
     	printf("[Error] bad instruction.\n");
      	return NULL;
     }
 
-    // 2. dispatch the msg to instr. controller
-    return dispatch(inst, ++msg);
+    // 2. skip the type byte and dispatch the msg to instr. controller
+    (*msg)++;
+    return dispatch(inst, msg);
 }

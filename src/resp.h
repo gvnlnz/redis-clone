@@ -5,7 +5,7 @@
 
 #define MAX_BUF_SIZE 512
 
-typedef void * (*t_func_ptr)(const char *msg);
+typedef void * (*t_func_ptr)(const char **msg);
 
 typedef enum {
     RESP_SIMPLE_STRING,
@@ -29,7 +29,7 @@ enum e_conv {
 
 typedef struct resp_array {
 	size_t size;
-	struct resp_value **elements;
+	struct t_resp_info **elements;
 } resp_array;
 
 typedef struct t_resp_info {
@@ -44,12 +44,12 @@ typedef struct t_resp_info {
 	} data;
 } t_resp_info;
 
-void *decode_simple_string(const char *msg);
-void *dispatch(char inst, const char *msg);
-void *decode_bulk_string(const char *msg);
-void *decode_double(const char *msg);
-void *decode_array(const char *msg);
-void *decode_error(const char *msg);
-void *decode_msg(const char *msg);
-void *decode_int(const char *msg);
+void *decode_simple_string(const char **msg);
+void *dispatch(char inst, const char **msg);
+void *decode_bulk_string(const char **msg);
+void *decode_double(const char **msg);
+void *decode_array(const char **msg);
+void *decode_error(const char **msg);
+void *decode_msg(const char **msg);
+void *decode_int(const char **msg);
 int resp_destroy(t_resp_info *buffer);
